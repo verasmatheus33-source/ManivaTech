@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ManivaTech — Plantas Medicinais da Amazônia</title>
+    <meta name="description" content="Sistema educativo sobre plantas medicinais amazônicas, identificação por foto e localização de UBS em Manaus.">
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="apple-touch-icon" href="/favicon.png">
+    <meta property="og:image" content="https://manivatech.netlify.app/logo.jpg">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+    <script type="module" src="/src/main.js"></script>
+</head>
+<body class="min-h-screen flex flex-col bg-slate-50 text-slate-800">
+
+<!-- Header / Alerta de Isenção -->
+<header class="bg-emerald-800 text-white shadow-md">
+    <div class="bg-amber-500 text-slate-900 px-4 py-2 text-center text-xs font-semibold uppercase tracking-wider">
+        ⚠️ Aviso Importante: Este sistema possui caráter estritamente educativo e preventivo e NÃO substitui a orientação médica profissional.
+    </div>
+    <div class="max-w-7xl mx-auto px-4 py-4 flex flex-col md:flex-row justify-between items-center">
+        <h1 class="m-0">
+            <a href="/" class="block bg-[#f7f7f8] rounded-xl px-3 py-1.5 shadow-sm">
+                <img src="/logo.jpg" alt="ManivaTech — Plantas Medicinais da Amazônia" width="800" height="580" class="h-16 md:h-20 w-auto">
+            </a>
+        </h1>
+        <nav class="flex flex-wrap justify-center items-center gap-4 mt-2 md:mt-0 text-sm font-medium">
+            <button data-modulo="busca" class="nav-btn hover:underline underline-offset-4">Busca e Ficha Técnica</button>
+            <button data-modulo="foto" class="nav-btn hover:underline underline-offset-4">Identificação por Foto</button>
+            <button data-modulo="mapa" class="nav-btn hover:underline underline-offset-4">Geolocalização UBS</button>
+            <!-- Botão de Acesso / Cadastro -->
+            <button id="btnAuth" class="bg-emerald-700 hover:bg-emerald-600 text-white px-4 py-1.5 rounded-lg border border-emerald-600 transition shadow-sm font-semibold">
+                👤 Entrar / Cadastrar
+            </button>
+            <!-- Usuário logado -->
+            <div id="usuarioLogado" class="hidden items-center gap-2">
+                <span class="bg-emerald-700 px-3 py-1.5 rounded-lg border border-emerald-600 font-semibold">👤 <span id="usuarioNome"></span></span>
+                <button id="btnSair" class="text-emerald-100 hover:text-white hover:underline">Sair</button>
+            </div>
+        </nav>
+    </div>
+</header>
+
+<!-- Aviso global -->
+<div id="toast" class="hidden fixed top-4 right-4 z-[60] max-w-sm bg-white border border-emerald-200 shadow-lg rounded-lg px-4 py-3 text-sm text-slate-800"></div>
+
+<!-- Main Container -->
+<main class="flex-grow max-w-7xl w-full mx-auto p-4 md:p-6">
+
+    <!-- MÓDULO 1: BUSCA E FICHA TÉCNICA -->
+    <section id="modulo-busca" class="space-y-6">
+        <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+            <h2 class="text-xl font-bold text-emerald-900 mb-2">Consulta de Acervo Botânico</h2>
+            <p class="text-sm text-slate-600 mb-4">Consulte dados validados baseados em compêndios da ANVISA e EMBRAPA.</p>
+            <form id="formBusca" class="flex gap-2">
+                <input type="search" id="inputBusca" placeholder="Ex: Jambu, Andiroba, Copaíba..." class="flex-grow border border-slate-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-600">
+                <button type="submit" class="bg-emerald-700 hover:bg-emerald-800 text-white px-6 py-2 rounded-lg font-medium transition">Pesquisar</button>
+            </form>
+            <p id="contadorBusca" class="text-xs text-slate-500 mt-3"></p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6" id="resultadoBusca"></div>
+    </section>
+
+    <!-- MÓDULO 2: IDENTIFICAÇÃO POR FOTO -->
+    <section id="modulo-foto" class="hidden space-y-6">
+        <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 max-w-2xl mx-auto text-center">
+            <h2 class="text-xl font-bold text-emerald-900 mb-2">Identificação por Reconhecimento de Imagem</h2>
+            <p class="text-sm text-slate-600 mb-6">Envie ou selecione uma foto clara da planta para identificar a espécie com Inteligência Artificial e cruzar o resultado com o acervo regional de Manaus.</p>
+
+            <label for="fileInput" class="border-2 border-dashed border-slate-300 rounded-xl p-8 flex flex-col items-center justify-center bg-slate-50 cursor-pointer hover:bg-slate-100 transition">
+                <img id="filePreview" alt="Pré-visualização da imagem" class="hidden max-h-48 rounded-lg mb-3 object-contain">
+                <svg id="fileIcon" class="w-12 h-12 text-slate-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                <span id="fileLabel" class="text-sm font-medium text-slate-700">Clique para carregar uma imagem</span>
+                <span class="text-xs text-slate-400 mt-1">PNG, JPG até 10MB</span>
+                <input type="file" id="fileInput" class="hidden" accept="image/*">
+            </label>
+
+            <button id="btnAnalisar" class="mt-6 bg-emerald-700 hover:bg-emerald-800 disabled:opacity-60 text-white px-6 py-2 rounded-lg font-medium transition w-full">Analisar Imagem</button>
+
+            <div id="resultadoIA" class="hidden mt-6 p-4 bg-emerald-50 border border-emerald-200 rounded-lg text-left">
+                <h4 class="font-bold text-emerald-900 text-sm">Resultado da Classificação por IA:</h4>
+                <p class="text-sm text-emerald-800 mt-1">🌿 Espécie identificada: <strong id="iaEspecie"></strong> — Confiança: <strong id="iaConfianca"></strong></p>
+                <p id="iaContra" class="text-xs font-bold text-amber-700 mt-2"></p>
+                <p id="iaObs" class="text-xs text-slate-600 mt-2"></p>
+            </div>
+        </div>
+    </section>
+
+    <!-- MÓDULO 3: GEOLOCALIZAÇÃO DE SAÚDE -->
+    <section id="modulo-mapa" class="hidden space-y-6">
+        <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-2">
+                <div>
+                    <h2 class="text-xl font-bold text-emerald-900">Rede de Atenção Primária à Saúde (Manaus - AM)</h2>
+                    <p class="text-sm text-slate-600">Localize as Unidades Básicas de Saúde (UBS) mais próximas para atendimento seguro.</p>
+                </div>
+                <button id="btnLocalizacao" class="bg-emerald-700 hover:bg-emerald-800 text-white text-xs px-4 py-2 rounded-lg font-medium transition flex items-center gap-1">
+                    📍 Usar Minha Localização Atual
+                </button>
+            </div>
+
+            <!-- Contêiner do Mapa Leaflet -->
+            <div id="map" class="w-full h-96 rounded-xl border border-slate-300 z-10"></div>
+
+            <div id="listaUbs" class="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4"></div>
+        </div>
+    </section>
+
+</main>
+
+<!-- MODAL DE LOGIN / CADASTRO DE USUÁRIO -->
+<div id="modalAuth" class="fixed inset-0 bg-black/50 z-50 hidden items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden border border-slate-200">
+        <!-- Cabeçalho do Modal -->
+        <div class="bg-emerald-800 text-white p-4 flex justify-between items-center">
+            <h3 id="modalTitulo" class="font-bold text-lg">Cadastrar no ManivaTech</h3>
+            <button id="btnFecharModal" aria-label="Fechar" class="text-white hover:text-slate-200 text-xl font-bold px-2">&times;</button>
+        </div>
+
+        <!-- Abas Alternadoras (Entrar / Cadastrar) -->
+        <div class="flex border-b border-slate-200 bg-slate-50">
+            <button id="abaCadastroBtn" data-aba="cadastro" class="flex-1 py-3 text-sm font-bold text-emerald-800 border-b-2 border-emerald-700 bg-white transition">Criar Conta</button>
+            <button id="abaLoginBtn" data-aba="login" class="flex-1 py-3 text-sm font-medium text-slate-500 hover:text-slate-700 transition">Já tenho conta</button>
+        </div>
+
+        <div class="p-6">
+            <p id="authMsg" class="hidden mb-4 text-sm rounded-lg px-3 py-2"></p>
+
+            <!-- Formulário de Cadastro -->
+            <form id="formCadastro" class="space-y-4">
+                <div>
+                    <label for="cadNome" class="block text-xs font-bold text-slate-700 mb-1">Nome Completo</label>
+                    <input type="text" id="cadNome" required placeholder="Ex: Maria Silva" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600">
+                </div>
+                <div>
+                    <label for="cadEmail" class="block text-xs font-bold text-slate-700 mb-1">E-mail Acadêmico ou Pessoal</label>
+                    <input type="email" id="cadEmail" required placeholder="seu.email@exemplo.com" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600">
+                </div>
+                <div>
+                    <label for="cadSenha" class="block text-xs font-bold text-slate-700 mb-1">Senha</label>
+                    <input type="password" id="cadSenha" required minlength="6" placeholder="Mínimo de 6 caracteres" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600">
+                </div>
+                <button type="submit" class="w-full bg-emerald-700 hover:bg-emerald-800 disabled:opacity-60 text-white font-medium py-2.5 rounded-lg transition text-sm shadow-sm">Concluir Cadastro</button>
+            </form>
+
+            <!-- Formulário de Login (Oculto por padrão) -->
+            <form id="formLogin" class="space-y-4 hidden">
+                <div>
+                    <label for="logEmail" class="block text-xs font-bold text-slate-700 mb-1">E-mail</label>
+                    <input type="email" id="logEmail" required placeholder="seu.email@exemplo.com" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600">
+                </div>
+                <div>
+                    <label for="logSenha" class="block text-xs font-bold text-slate-700 mb-1">Senha</label>
+                    <input type="password" id="logSenha" required placeholder="Sua senha" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600">
+                </div>
+                <button type="submit" class="w-full bg-emerald-700 hover:bg-emerald-800 disabled:opacity-60 text-white font-medium py-2.5 rounded-lg transition text-sm shadow-sm">Entrar no Sistema</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Footer -->
+<footer class="bg-white border-t border-slate-200 py-4 text-center text-xs text-slate-500">
+    ManivaTech © 2026 — Projeto Acadêmico | Centro Universitário Fametro
+</footer>
+
+<!-- Leaflet JS para renderizar o mapa -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+</body>
+</html>
